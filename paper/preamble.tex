@@ -1,0 +1,180 @@
+%%%% Packages
+\usepackage{microtype}              % adjusts LaTeX's default spacing
+\usepackage{amsmath,amssymb,amsthm} % display math
+\usepackage{bussproofs}
+\usepackage{listings}
+\lstloadlanguages{Haskell}
+\lstnewenvironment{haskell}
+    {\lstset{}%
+      \csname lst@SetFirstLabel\endcsname}
+    {\csname lst@SaveFirstLabel\endcsname}
+    \lstset{
+      basicstyle=\small\ttfamily,
+      flexiblecolumns=false,
+      basewidth={0.5em,0.45em},
+      literate={+}{{$+$}}1 {/}{{$/$}}1 {*}{{$*$}}1 {=}{{$=$}}1
+               {>}{{$>$}}1 {<}{{$<$}}1 {\\}{{$\lambda$}}1
+               {\\\\}{{\char`\\\char`\\}}1
+               {->}{{$\rightarrow$}}2 {>=}{{$\geq$}}2 {<-}{{$\leftarrow$}}2
+               {<=}{{$\leq$}}2 {=>}{{$\Rightarrow$}}2 
+               {\ .}{{$\circ$}}2 {\ .\ }{{$\circ$}}2
+               {>>}{{>>}}2 {>>=}{{>>=}}2
+               {|}{{$\mid$}}1               
+    }
+\usepackage{tikz}
+\usepackage{tikz-cd}                % draw commutative diagrams
+
+\setlength{\columnsep}{1cm}
+%%%% Macros for mathematical notation
+\newcommand{\domain}[1]{%
+  \mathrm{dom}(#1)%
+}
+\newcommand{\codomain}[1]{%
+  \mathrm{cod}(#1)%
+}
+\newcommand{\idarrow}[1][]{%
+  \mathbf{1}_{#1}%
+}
+
+
+%%% Common categories
+\newcommand*{\cat}[1]{{\mathcal{#1}}} % categories in bold upright
+\newcommand*{\Cat}{\cat{Cat}} % categories and functors
+\newcommand*{\Sets}{\cat{Sets}} % sets and functions
+\newcommand*{\Rel}{\cat{Rel}} % sets and relations
+\newcommand*{\Posets}{\cat{Posets}} % posets and monotone maps
+\newcommand*{\Pos}{\cat{Pos}} % shorter name for the above
+\newcommand*{\Mon}{\cat{Mon}} % monoids
+\newcommand*{\Groups}{\cat{Groups}} % groups
+\newcommand*{\Graphs}{\cat{Graphs}} % monoids
+\newcommand*{\Ident}{\cat{I}}
+
+\usepackage{float}
+\usepackage{wrapfig}
+%%% Natural numbers
+\newcommand*{\bN}{{\mathbb{N}}}
+\newcommand*{\bR}{{\mathbb{R}}}
+\newcommand*{\bQ}{{\mathbb{Q}}}
+
+%%% Epis and monos
+\newcommand*{\epito}{\twoheadrightarrow}
+\newcommand*{\monoto}{\rightarrowtail}
+
+%%% Comma category operator
+\newcommand*{\comcat}{\mathop{\downarrow}}
+
+%%% Opposite and inverse
+\newcommand*{\inv}{^{-1}}
+\newcommand*{\op}{^{\mathrm{op}}}
+
+%%% Operators
+\DeclareMathOperator{\Hom}{Hom}
+\DeclareMathOperator{\dom}{dom}
+\DeclareMathOperator{\cod}{cod}
+\DeclareMathOperator{\im}{im}
+
+
+\newcommand{\module}[1]{{\sf #1}}
+
+\newcommand{\bigdiamond}{%
+           \mathrel{\raisebox{-.77pt}{%
+           \reflectbox{\rotatebox[origin=c]{45}{\scalebox{1.035}[1]{$\square$}}}}}}
+
+\newcommand{\diamondast}{\mathrel{\hspace{-.35pt}\mathrlap{\bigdiamond}\hspace{2.4pt}\ast\hspace{2.4pt}}}
+
+\newcommand{\infixfmap}{\mathrel{\hspace{-.25pt}\mathrlap{\bigdiamond}\hspace{3.05pt}\raisebox{0pt}{\scalebox{.75}{$\mathrm{\$}$}}\hspace{3.1pt}}}
+
+\newcommand{\streamcons}{\mathrel{\hspace{-.25pt}\mathrlap{\bigdiamond}\hspace{3.6pt}\raisebox{.7pt}{\scalebox{.75}{\bf:}}\hspace{3.5pt}}}
+
+\newcommand{\doubleequals}{\mathrel{\scalebox{.55}[1]{\(=\)}\hspace{.75pt}\scalebox{.55}[1]{\(=\)}}}
+
+\newcommand{\rfish}{\mathrel{>\!\!=\!\!\!>}}
+\newcommand{\lfish}{\mathrel{<\!\!\!=\!\!<}}
+\newcommand{\infixextend}{\mathrel{<\!\!\!<\!\!\!=}}
+\newcommand{\infixflipextend}{\mathrel{=\!\!\!>\!\!\!>}}
+\newcommand{\corfish}{=\!\!\!>\!\!\!=}
+\newcommand{\colfish}{=\!\!\!<\!\!\!=}
+
+\newcommand{\prfstp}[1]{\LeftLabel{\scriptsize{(#1)}}}
+
+%format ^ = "\ "
+%format === = "\equiv"
+%format == = "\doubleequals"
+%format True = "\mathsf{True}"
+%format False = "\mathsf{False}"
+%format Bool = "\mathsf{Bool}"
+%format Maybe = "\mathsf{Maybe}"
+%format Just = "\mathsf{Just}"
+%format Nothing = "\mathsf{Nothing}"
+%format id = "\mathsf{id}"
+%format extract = "\mathsf{extract}"
+%format duplicate = "\mathsf{duplicate}"
+%format extend = "\mathsf{extend}"
+%format Functor = "\mathsf{Functor}"
+%format Comonad = "\mathsf{Comonad}"
+%format Monad = "\mathsf{Monad}"
+%format ComonadApply = "\mathsf{ComonadApply}"
+%format Applicative = "\mathsf{Applicative}"
+%format Alternative = "\mathsf{Alternative}"
+%format Compose = "\mathsf{Compose}"
+%format getCompose = "\mathsf{getCompose}"
+%format fix = "\mathsf{fix}"
+%format $ = "\mathrel{\$}"
+%format <*> = "\mathrel{\circledast}"
+%format <$> = "\infixfmap"
+%format <@> = "\diamondast"
+%format >=> = "\rfish"
+%format <=< = "\lfish"
+%format <<= = "\infixextend"
+%format =>> = "\infixflipextend"
+%format =>= = "\corfish"
+%format =<= = "\colfish"
+%format pure = "\mathsf{pure}"
+%format traverse = "\mathsf{traverse}"
+%format uncurry = "\mathsf{uncurry}"
+%format curry = "\mathsf{curry}"
+%format fmap = "\mathsf{fmap}"
+%format flip = "\mathsf{flip}"
+%format head = "\mathsf{head}"
+%format init = "\mathsf{init}"
+%format tail = "\mathsf{tail}"
+%format last = "\mathsf{last}"
+%format tails = "\mathsf{tails}"
+%format inits = "\mathsf{inits}"
+%format ap = "\mathsf{ap}"
+%format return = "\mathsf{return}"
+%format join = "\mathsf{join}"
+%format fst = "\mathsf{fst}"
+%format snd = "\mathsf{snd}"
+%format *** = "\times "
+%format !!  = "\mathrel{!!}"
+%format length = "\mathsf{length}"
+%format sum = "\mathsf{sum}"
+%format undefined = "\bot"
+%format mappend (x) (y) = x "\oplus" y
+%format mempty = "\varepsilon"
+%format iterate = "\mathsf{iterate}"
+%format print = "\mathsf{print}"
+%format main = "\mathsf{main}"
+%format repeat = "\mathsf{repeat}"
+%format const = "\mathsf{const}"
+%format succ = "\mathsf{succ}"
+%format take = "\mathsf{take}"
+%format family = "\mathrm{\mathbf{family}}"
+%format unfold = "\mathsf{unfold}"
+%format Integer = "\mathsf{Integer}"
+%format negate = "\mathsf{negate}"
+%format foldr = "\mathsf{foldr}"
+%format replicate = "\mathsf{replicate}"
+%format abs = "\mathsf{abs}"
+%format Distributive = "\mathsf{Distributive}"
+%format Traversable = "\mathsf{Traversable}"
+%format Foldable = "\mathsf{Foldable}"
+%format traverse = "\mathsf{traverse}"
+%format sequenceA = "\mathsf{sequenceA}"
+%format distribute = "\mathsf{distribute}"
+%format filter = "\mathsf{filter}"
+%format map = "\mathsf{map}"
+%format Int = "\mathsf{Int}"
+%format ~ = "\mathrel{\sim}"
+%format Eq = "\mathsf{Eq}"

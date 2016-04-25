@@ -1,0 +1,7 @@
+#!/bin/sh
+
+# Renders file $1.md into $1.pdf
+
+# TODO: Check if argument present, if not, display help
+
+pandoc --include-in-header preamble.tex --filter pandoc-citeproc --csl acm-sig-proceedings.csl --biblio paper.bib -N -f markdown+raw_tex -s paper.md -o paper.md.pdf

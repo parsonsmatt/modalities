@@ -39,7 +39,7 @@ Modal logic is an augmentation of propositional logic that provides a pair of ne
 - $\Box$, signifying 'always' or 'necessarily'
 - $\Diamond$, signifying 'at some point in the future' or 'possibly'
 
-The precise system of modal logic is determined by which axioms you take.
+The precise semantics of modal logic are determined by which axioms you take.
 Some common axioms are provided here:
 
 - N: Necessity: if $A$ is a theorem, then so is $\Box A$.
@@ -49,7 +49,9 @@ Some common axioms are provided here:
 - B: $A \implies \Box \Diamond A$
 - 5: $\Diamond A \implies \Box \Diamond A$
 
+The exact system of modal logic depends on which of these axioms you take.
 The core of modal logic is a tower of these axioms, each added one at a time: K is the combination of N and K axioms, T adds reflexivity, $S4$ adds the 4 axiom, and $S5$ adds either the 5 axiom or the B axiom.
+
 
 ## Propositions as Types
 

@@ -18,7 +18,10 @@ library
   exposed-modules:     Logic.Modal
   build-depends:       base >= 4.7 && < 5
                      , adjunctions
+                     , comonad
+                     , semigroupoids
   default-language:    Haskell2010
+  default-extensions:  MultiParamTypeClasses
 
 executable modalities-exe
   hs-source-dirs:      app

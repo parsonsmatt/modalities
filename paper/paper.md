@@ -51,6 +51,27 @@ Some common axioms are provided here:
 
 The core of modal logic is a tower of these axioms, each added one at a time: K is the combination of N and K axioms, T adds reflexivity, $S4$ adds the 4 axiom, and $S5$ adds either the 5 axiom or the B axiom.
 
+These axioms speak to the specific characteristics of the accessibility relationship.
+The three major traits of the accessibility relationship are:
+
+| Propery |  Logic | Diagram |
+|---------|------------|----------------------|
+| Transitivity | $\Box A \implies \Box \Box A$ | $$
+\begin{tikzcd}
+A \arrow[r, bend right] \arrow[rr, bend left, dotted] & B \arrow[r, bend right] & C
+\end{tikzcd}
+$$ |
+| Reflexivity | $\Box A \implies A$ | $$
+ \begin{tikzpicture}
+   \node (a) {$A$};
+   \path[->] (a) edge [loop above] node {} ();
+  \end{tikzpicture}
+$$ |
+| Symmetry | $\Diamond A \implies \Box \Diamond A$ | $$
+\begin{tikzcd}
+A \arrow[r, bend right] & B \arrow[l, bend right]
+\end{tikzcd} $$ |
+
 ## Propositions as Types
 
 The Curry-Howard correspondence tells us that a logical sentence is equivalent to a type signature in a programming language, a logical proof is equivalent to an expression fitting the type of the sentence, and the evaluation of programs is equivalent to the simplification of proofs. [@wadler2015propositions]
@@ -59,6 +80,9 @@ The more interesting things we can say in our types, the more useful they are in
 Compile-time verification is particularly appealing: we can't even run the code if it doesn't make sense!
 
 ## Lambda 5
+
+Let's evaluate the logical system Lambda 5 as defined by Murphy. [@murphy2004symmetric]
+Murphy begins with the intuitionistic formulation of S5, $IS5$.
 
 # Category Theory
 
@@ -280,10 +304,13 @@ Given a value in a monadic structure `m`, we can provide a function that operate
 `bind` handles the boilerplate of flattening it back out.
 Monads are a convenient way to express state, asynchronous computation, and computation that may error.
 
+The use of monads in computer science was initially discovered by Eugenio Moggi [@moggi89] and then popularized by Wadler [@wadler95] and others for use in functional programming.
+
 ## Comonad
 
 A comonad is the categorical dual of a monad.
-In category theory, the dual of a concept is arrived at by taking the object's diagram and reversing all of the arrows.
+In category theory, all ideas have a dual.
+The dual of a concept is the object's diagram and with all of the arrows reversed.
 We can arrive at something similar by reversing the arrows of types in type signatures.
 Flipping the `Monad` function's arrows gives us:
 
@@ -321,12 +348,12 @@ To `duplicate` a stream, we set the value of index $i_n$ to be the entire stream
 ## Adjunctions
 
 An adjunction is a pair of functors which generalize the notion of a Galois connection.
-From the category $\cat{C}$, the functor $L$ *lifts* an object to the category $\cat{D}$.
-The functor $F$ then *forgets* some information about an object in $D$ to map the object back to $C$.
-This isn't necessarily an isomorphism, as forgetting composed with lifting $L \circ F$ loses some information and can't map the object back.
-However, lifting followed by forgetting $F \circ L$ is equivalent to the $Id$ functor, and $F \circ L \circ F$ is equivalent to $F$.
+From the category $\cat{C}$, the functor $R$ *lifts* an object to the category $\cat{D}$ by providing some free structure.
+The functor $L$ then *loses* some information about an object in $D$ to map the object back to $C$.
+This isn't necessarily an isomorphism, as forgetting composed with lifting $R \circ L$ loses some information and can't map the object back.
+However, lifting followed by forgetting $L \circ R$ is equivalent to the $Id$ functor, and $R \circ L \circ R$ is equivalent to $R$.
 
-In this case, we write $F \dashv L$ to say that $F$ is left adjoint to $L$ and that $L$ is right adjoint to $F$.
+In this case, we write $L \dashv R$ to say that $L$ is left adjoint to $R$ and that $R$ is right adjoint to $L$.
 An adjunction permits two
 
 ### A Common Adjunction: Pair and Function
@@ -445,6 +472,18 @@ Our task is to now find the appropriate functors and categories to provide a sui
 
 # Implementing in Haskell
 
+The theory has presented us with a neat implementation plan.
+We can arrive at an S5 modal logic categorically.
+First, we'll define a type class that represents the axioms of S5 modal logic:
 
+```haskell
+class Modal dia box where
+  axiomK :: box (a -> b) -> box a -> box b
+  axiomT :: box a -> a
+  axiom5 :: dia a -> box (dia a)
+```
+
+Adjunctions (among other related abstractions) are defined in the Haskell package `adjunction` maintained by Edward Kmett. [@kmett-adjunctions-4.3]
+The type class we'
 
 # References

@@ -40,7 +40,7 @@ Modal logic is an augmentation of propositional logic that provides a pair of ne
 - $\Diamond$, signifying 'at some point in the future' or 'possibly'
 
 The precise semantics of modal logic are determined by which axioms you take.
-Some common axioms are provided here:
+The common axioms are described here:
 
 - N: Necessity: if $A$ is a theorem, then so is $\Box A$.
 - K: Distribution $\Box(A \implies B) \implies (\Box A \implies \Box B)$
@@ -49,27 +49,86 @@ Some common axioms are provided here:
 - B: $A \implies \Box \Diamond A$
 - 5: $\Diamond A \implies \Box \Diamond A$
 
-The exact system of modal logic depends on which of these axioms you take.
 The core of modal logic is a tower of these axioms, each added one at a time: K is the combination of N and K axioms, T adds reflexivity, $S4$ adds the 4 axiom, and $S5$ adds either the 5 axiom or the B axiom.
 
+|   Transitivity   |    Reflexivity    |     Symmetry     |
+|:-------------------:|:-------------------:|:-------------------:|
+| $\Box A \implies \Box \Box A$ |  $\Box A \implies A$  | $\Diamond A \implies \Box \Diamond A$ |
+| $$
+\begin{tikzcd}
+A \arrow[r, bend right] \arrow[rr, bend left, dotted] & B \arrow[r, bend right] & C
+\end{tikzcd}
+$$ | $$
+ \begin{tikzpicture}
+   \node (a) {$A$};
+   \path[->] (a) edge [loop above] node {} ();
+  \end{tikzpicture}
+$$ | $$
+\begin{tikzcd}
+A \arrow[r, bend right] & B \arrow[l, bend right]
+\end{tikzcd} $$ |
+
+These axioms speak to the specific characteristics of the accessibility relationship.
+It's easiest to discuss these in terms of the 'possible worlds' model of modal logic, where $A$ means that $A$ is true in this world, $\Box A$ means that $A$ is necessarily true in all worlds, and $\Diamond A$ means that $A$ is true in some possible world.
+The three major traits of the accessibility relationship are transitivity (if world A can access world B, and world B can access world A, then A can access C), reflexivity (world A can access world A), and symmetry (if world A can access world B, then world B can access world A).
+As an aside, the reflexivity and transitivity properties are precisely what is necessary to form a category.
 
 ## Propositions as Types
 
 The Curry-Howard correspondence tells us that a logical sentence is equivalent to a type signature in a programming language, a logical proof is equivalent to an expression fitting the type of the sentence, and the evaluation of programs is equivalent to the simplification of proofs. [@wadler2015propositions]
 Therefore, the type systems for our programming languages serve as systems to make logical statements about our programs.
 The more interesting things we can say in our types, the more useful they are in verifying the correctness of our programs.
-Compile-time verification is particularly appealing: we can't even run the code if it doesn't make sense!
+Compile-time verification is particularly appealing: we can't even run the code if it doesn't make logical sense!
 
 ## Lambda 5
+
+Let's evaluate the logical system Lambda 5 as defined by Murphy. [@murphy2004symmetric]
+It's designed to be used as a type theory for distributed computation.
+The "many worlds" in this logic are the distinct computers running in a distributed network.
+Murphy's logic interprets $\Box A$ to mean "Mobile code of type $A$ that can be executed on any computer,"
+and $\Diamond A$ to mean "an address of a remote value of type $A$."
+
+Because the relationship between computers on a network is reflexive, transitive, and symmetric, the $S5$ logic is the basis for this system.
+Furthermore, because constructive proofs are more useful for type theories, the intuitionistic variant $IS5$ is used.
+Intuitionistic logic dispenses with double negation and the law of excluded middle.
+In this system, the two operators can no longer be expressed in terms of each other.
+This makes the $B$ and $5$ axioms tricky.
+Since it's generally not accepted to do $A \implies \Box A$, and the two axioms are able to generate some boxiness given some diamondness, then they *must* be related somehow.
+
+The specific axioms for $IS5$ are given below: [@Galmiche2010]
+
+1. $\Box (A \implies B) \implies (\Box A \implies \Box B)$
+2. $\Box (A \implies B) \implies (\Diamond A \implies \Diamond B)$
+3. $\Diamond \bot \implies \bot$
+4. $\Diamond (A \land B) \implies (\Diamond A \land \Diamond B)$
+5. $(\Diamond A \implies \Box B) \implies \Box (A \implies B)$
+6. $(\Box A \implies A) \land (A \implies \Diamond A)$
+7. $(\Diamond \Box A \implies \Box A) \land (\Diamond A \implies \Box \Diamond A)$
+
+The operational semantics for the Lambda 5 language involve deterministic sequential machines operating on various worlds, termed $w_i$.
+A value can be accessed remotely given a world name $w_i$ and the label for the value.
+
+One of the key examples given is the symmetry axiom, $\Diamond \Box A \implies \Box A$.
+We can read this as "Given a remote address to a value of mobile code that can run anywhere and produce an $A$, we can retrieve that code and run it here."
+The proof term given in the paper is:
+
+$$\lambda x. letd \ w.y = x \ in \ \text{fetch[w]} y$$
+
+where $letd$ is part of the $\Diamond$ elimination rule, which binds a pair of variables $w$ (representing the world that the value originated in) and $y$ (the value at that world) in the expression after $in$.
+`fetch` takes a value $M : \Box A @ w'$ and runs it in the current world $w$.
+
+The abstract machine that performs these operations is based on continuations.
 
 # Category Theory
 
 Category theory is a branch of abstract mathematics that seeks to provide a unifying meta-language to talk about mathematics.
+The following sections introduce ideas in category theory that we need in order to provide the link to the modal logic above.
+This theory will inform our implementation in Haskell.
 
 ## Category
 
 A category is an algebraic structure consisting of a collection of objects and morphisms (or arrows) between objects.
-Categories generalize sets, and arrows generalize functions.
+Categories generalize sets, and arrows generalize functions where the domain and range are equal.
 
 For $\cat{C}$ to be a category, the objects and morphisms must satisfy the following properties:
 
@@ -88,14 +147,18 @@ a \arrow[dr,"f"] \arrow[rr, "f \circ g"] & & c \\
 \end{tikzcd} $$
 Arrows in category theory correspond with implication in logic and function types in type theory.
 
+The notion of objects and arrows permits the drawing of illustrative diagrams.
+The associativity property means that any diagram is *commutative*:
+any path you follow from one object to another using the directed arrows yields the same final result.
+If we have two paths through a diagram, then we can select the shortest path and be confident that our result is the same.
+
 ## Functor
 
-Previously, the arrows in a category were introduced as generalized functions.
-This isn't quite correct.
+Arrows in a category don't quite generalize functions in the same way that categories generalize sets.
 For a category $\cat{C}$, the arrows in the category correspond to endomorphisms: functions with the type $f : \forall a \in \cat{C} .\ a \to a$.
 Functions like $\lambda x. x^2 : \bR \to \bR$ or $Succ : \bN \to \bN$ are examples.
 
-Functions that break this intuition map elements from one set to another, like $\lambda x y. \frac{x}{y} : \bN \to \bN \to \bQ$.
+Functions that map elements from one set to another, like $\lambda x y. \frac{x}{y} : \bN \to \bN \to \bQ$, require a more powerful concept.
 The categorical equivalent is called a functor.
 A functor $F$ is a mapping between categories $\cat{C}$ and $\cat{D}$.
 $F$ maps every object and arrow in $\cat{C}$ to $\cat{D}$ with two laws:
@@ -103,7 +166,7 @@ $F$ maps every object and arrow in $\cat{C}$ to $\cat{D}$ with two laws:
 $$\begin{tikzcd}
 F(a) \in \cat{D} \arrow[r, "F(f)"] & F(b)
 \\
-a \in \cat{C} \arrow[u, "F"] \arrow[r, "f"] & b \arrow[u, "F"]
+a \in \cat{C} \arrow[u, "F"] \arrow[r, "f"] & b \in \cat{C} \arrow[u, "F"]
 \end{tikzcd} $$
 
 ### Identity
@@ -168,7 +231,7 @@ as well as continuations:
 newtype Cont r a = Cont { runCont :: (a -> r) -> r }
 
 instance Functor (Cont r) where
-    fmap f c = (Cont (\k -> runCont c (k . f))
+    fmap f c = Cont (\k -> runCont c (k . f))
 ```
 
 and stateful computation:
@@ -200,7 +263,7 @@ In Haskell, a natural transformation can be expressed using a Rank 2 type:
 type Nat f g = forall x. f x -> g x
 ```
 
-The use of the rank 2 type constrains the function from being able to view or inspect the values inside the functors at all.
+The use of the rank 2 type constrains the function from being able to view or inspect the values inside the functors.
 
 A function to convert a `[a]` into a `Vector a` is an easy natural transformation, as is the inverse
 There's also a natural transformation `[a]` to `Map Int a`, where the integer keys are the indexes in the list.
@@ -222,7 +285,6 @@ listToMaybe (x:_) = Just x
 listToMaybe []    = Nothing
 ```
 
-
 ## Monad
 
 A monad is a functor mapping a category to itself that is equipped with two natural transformations:
@@ -230,7 +292,7 @@ A monad is a functor mapping a category to itself that is equipped with two natu
 1. $\eta$, or `return`, taking any object from the identity functor $I(\cat{C})$ to $F(\cat{C})$.
 2. $\mu$, or `join`, taking objects from $F(F(\cat{C}))$ to $F(\cat{C})$.
 
-Monads follow the monoid laws where the unit is $\eta$ and $\oplus$ is $\mu$.
+Monads follow the monoid laws of associativity and identity where the unit is $\eta$ and $\oplus$ is $\mu$.
 
 ### Examples
 
@@ -282,10 +344,13 @@ Given a value in a monadic structure `m`, we can provide a function that operate
 `bind` handles the boilerplate of flattening it back out.
 Monads are a convenient way to express state, asynchronous computation, and computation that may error.
 
+The use of monads in computer science was initially discovered by Eugenio Moggi [@moggi89] and then popularized by Wadler [@wadler95] and others for use in functional programming.
+
 ## Comonad
 
 A comonad is the categorical dual of a monad.
-In category theory, the dual of a concept is arrived at by taking the object's diagram and reversing all of the arrows.
+In category theory, all ideas have a dual.
+The dual of a concept is given by taking the object's diagram reversing all of the arrows.
 We can arrive at something similar by reversing the arrows of types in type signatures.
 Flipping the `Monad` function's arrows gives us:
 
@@ -323,17 +388,17 @@ To `duplicate` a stream, we set the value of index $i_n$ to be the entire stream
 ## Adjunctions
 
 An adjunction is a pair of functors which generalize the notion of a Galois connection.
-From the category $\cat{C}$, the functor $L$ *lifts* an object to the category $\cat{D}$.
-The functor $F$ then *forgets* some information about an object in $D$ to map the object back to $C$.
-This isn't necessarily an isomorphism, as forgetting composed with lifting $L \circ F$ loses some information and can't map the object back.
-However, lifting followed by forgetting $F \circ L$ is equivalent to the $Id$ functor, and $F \circ L \circ F$ is equivalent to $F$.
+From the category $\cat{C}$, the functor $R$ *lifts* an object to the category $\cat{D}$ by providing some free structure.
+The functor $L$ then *loses* some information about an object in $D$ to map the object back to $C$.
+This isn't necessarily an isomorphism, as forgetting composed with lifting $R \circ L$ loses some information and can't map the object back.
+However, lifting followed by forgetting $L \circ R$ is equivalent to the $Id$ functor, and $R \circ L \circ R$ is equivalent to $R$.
 
-In this case, we write $F \dashv L$ to say that $F$ is left adjoint to $L$ and that $L$ is right adjoint to $F$.
-An adjunction permits two
+In this case, we write $L \dashv R$ to say that $L$ is left adjoint to $R$ and that $R$ is right adjoint to $L$.
+An interesting property of an adjunction is that every adjunction gives rise to both a monad through $R \circ L$ and a comonad through $\L \circ R$.
 
 ### A Common Adjunction: Pair and Function
 
-The Haskell tuple `(r, a)` (also known as $Prod_r \ a$) and function `r -> a` (Also known as $Exp_r \ a$) are both functors, and it is the case that $Prod \dashv Exp$.
+The Haskell tuple `(r, a)` (also known as $Prod_r \ a$) and function `r -> a` (also known as $Exp_r \ a$) are both functors, and it is the case that $Prod \dashv Exp$.
 
 ```haskell
 instance Functor ((,) r) where
@@ -341,7 +406,36 @@ instance Functor ((,) r) where
 
 instance Functor ((->) r) where
     fmap f k = f . k
+
+class (Functor g, Functor f) => Adjunction f g | f -> g, g -> f where
+    unit   :: a -> g (f a)
+    counit :: f (g a) -> a
+    left   :: (f a -> b) -> a -> g b
+    right  :: (a -> g b) -> f a -> b
+
+instance Adjunction ((,) r) ((->) r) where
+    unit a        = \r -> (r, a)
+    counit (r, f) = f r
 ```
+
+We can specialize the type of `unit` to this specific adjunction, which illustrates the monad/comonad:
+
+```haskell
+unit   :: a -> r -> (r, a)
+counit :: (r, r -> a) -> a
+```
+
+Indeed, we can write a generic instance of the `Monad` type class in Haskell that works with any composition of two functors which form an adjunction.
+This is witnessed below:
+
+```haskell
+newtype Compose f g a = Compose { decompose :: f (g a) }
+
+instance Adjunction f g => Monad (Compose g f) where
+    return = Compose . unit
+    m >>= f = Compose . fmap (right (decompose . f)) . decompose $ m
+```
+
 
 # Link to Modal Logic
 
@@ -353,32 +447,7 @@ Can we prove these?
 
 $\eta$ is simple enough.
 It corresponds with the $\Diamond$ introduction rule $A \vdash \Diamond A$: "If A is true, then A is possibly true."
-
-A proof of $\mu$ assumes $\Diamond \Diamond A$ and wants to arrive at $\Diamond A$.
-
-\begin{prooftree}
-\AxiomC{$\Diamond \Diamond A$}
-
-\LeftLabel{\scriptsize(1)}
-\RightLabel{Classical Equivalence}
-\UnaryInfC{$\neg \Box \neg \Diamond A$}
-
-\LeftLabel{\scriptsize(2)}
-\RightLabel{Classical Equivalence}
-\UnaryInfC{$\neg \Box \neg \neg \Box \neg A$}
-
-\LeftLabel{\scriptsize(3)}
-\RightLabel{Double Negation}
-\UnaryInfC{$\neg \Box \Box \neg A$}
-
-\LeftLabel{\scriptsize(4)}
-\RightLabel{Axiom T}
-\UnaryInfC{$\neg \Box \neg A$}
-
-\LeftLabel{\scriptsize(5)}
-\RightLabel{Classical Equivalence}
-\UnaryInfC{$\Diamond A$}
-\end{prooftree}
+$\mu$, likewise, is the $\Diamond 4$ axiom.
 
 We can additionally prove the type of `bind :: Monad m => m a -> (a -> m b) -> m b` by taking advantage of the distribution of $\Diamond$ over implication.
 
@@ -447,6 +516,18 @@ Our task is to now find the appropriate functors and categories to provide a sui
 
 # Implementing in Haskell
 
+The theory has presented us with a neat implementation plan.
+We can arrive at an S5 modal logic categorically.
+First, we'll define a type class that represents the axioms of S5 modal logic:
 
+```haskell
+class Modal dia box where
+  axiomK :: box (a -> b) -> box a -> box b
+  axiomT :: box a -> a
+  axiom5 :: dia a -> box (dia a)
+```
+
+Adjunctions (among other related abstractions) are defined in the Haskell package `adjunction` maintained by Edward Kmett. [@kmett-adjunctions-4.3]
+The type class we'
 
 # References

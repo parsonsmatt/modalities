@@ -17,7 +17,7 @@ The naive implementation of FRP is prone to space- and time-leaks, which can be 
 The first is through category theory: by using an abstraction called an `Arrow`, Hudak et al [@hudak2002] solve many of these issues.
 The second is through logic: Jeffery [@Jeffrey2012] demonstrates that Linear-time Temporal Logic types FRP well, and the additional rules of LTL provide safeguards against these performance issues.
 
-Foner's "Getting a Quick Fix on Comonads" [@foner2015] examined an interpretation of Löb's theorem and determined that it did not properly satisfy the axioms of $S4$ modal logic.
+Foner's "Getting a Quick Fix on Comonads" [@foner2015] examined an interpretation of Löb's theorem in Haskell and determined that it did not properly satisfy the axioms of $S4$ modal logic.
 By finding an appropriate Haskell type class that fit the logic more closely, he was able to derive a rather natural and efficient implementation of $n$-dimensional spreadsheets with relative references.
 The type class in question is `ComonadApply`, a concept imported from category theory.
 
@@ -28,11 +28,11 @@ Logic and categories both offer compelling resources for software developers to 
 Murphy does not mention category theory in his work.
 Is it possible that a categorical interpretation of his distributed system might provide additional insights or implementation tricks?
 
-# Distributed Modal Logic
+# The Logic
 
 Before diving into the logic presented in Murphy's paper on Lambda 5 [@murphy2004symmetric], let's review the basic concepts of modal logic.
 
-## Plain Modal Logic
+## Modal Logic
 
 Modal logic is an augmentation of propositional logic that provides a pair of new operators:
 
@@ -75,9 +75,10 @@ As an aside, the reflexivity and transitivity properties are precisely what is n
 
 ## Propositions as Types
 
-The Curry-Howard correspondence tells us that a logical sentence is equivalent to a type signature in a programming language, a logical proof is equivalent to an expression fitting the type of the sentence, and the evaluation of programs is equivalent to the simplification of proofs. [@wadler2015propositions]
+The Curry-Howard correspondence tells us that a logical proposition is equivalent to a type signature in a programming language, a logical proof is equivalent to an expression fitting the type of the sentence, and the evaluation of programs is equivalent to the simplification of proofs. [@wadler2015propositions]
 Therefore, the type systems for our programming languages serve as systems to make logical statements about our programs.
 The more interesting things we can say in our types, the more useful they are in verifying the correctness of our programs.
+By having these interesting things correspond to a well-behaved formal logic, then we constrain ourselves to making sense.
 Compile-time verification is particularly appealing: we can't even run the code if it doesn't make logical sense!
 
 ## Lambda 5
@@ -114,10 +115,9 @@ The proof term given in the paper is:
 
 $$\lambda x. letd \ w.y = x \ in \ \text{fetch[w]} y$$
 
-where $letd$ is part of the $\Diamond$ elimination rule, which binds a pair of variables $w$ (representing the world that the value originated in) and $y$ (the value at that world) in the expression after $in$.
-`fetch` takes a value $M : \Box A @ w'$ and runs it in the current world $w$.
-
-The abstract machine that performs these operations is based on continuations.
+where $letd$ is a primitive of the $\Diamond$ elimination rule, which binds a pair of variables $w$ (representing the world that the value originated in) and $y$ (the value at that world) in the expression after $in$.
+`fetch` is a primitive that takes a value $M : \Box A @ w'$ and runs it in the current world $w$.
+The signature $M : \Box A @ w'$ can be read as: $M$ is a continuation that can be executed at any world currently located at $w'$.
 
 # Category Theory
 
@@ -127,9 +127,8 @@ This theory will inform our implementation in Haskell.
 
 ## Category
 
-A category is an algebraic structure consisting of a collection of objects and morphisms (or arrows) between objects.
-Categories generalize sets, and arrows generalize functions where the domain and range are equal.
-
+A category is an algebraic structure consisting of a collection of objects and morphisms (also known as arrows) between objects.
+For a first intuition, categories generalize sets, and arrows generalize functions where the domain and range are the same.
 For $\cat{C}$ to be a category, the objects and morphisms must satisfy the following properties:
 
 1. Each object has an identity arrow:
@@ -244,6 +243,8 @@ instance Functor (State s) where
                               in (f a, s'))
 ```
 
+The `fmap` operation is about generalizing a function that works on ordinary values to work on a whole `Functor`ful of ordinary values.
+
 ## An Entirely Natural Transformation
 
 A natural transformation is a mapping $\eta$ between two functors $F$ and $G$ on two categories $\cat{C}$ and $\cat{D}$ that satisfy the following commutative diagram:
@@ -255,9 +256,13 @@ G(X) \arrow[r, "G(f)"] & G(Y)
 \end{tikzcd}$$
 
 A natural transformation is a way to convert one functor into another.
+Similar to how categories+functors form a category, natural transformations and functors between two categories also form a category.
+The objects in the category are the functors, and the morphisms are the natural transformations.
 
 ### Code Examples
-In Haskell, a natural transformation can be expressed using a Rank 2 type:
+
+The essence of a natural transformation is that you shouldn't use any of the information from the objects in the underlying category when mapping the functors.
+In Haskell, this can be expressed in terms of a rank 2 type:
 
 ```haskell
 type Nat f g = forall x. f x -> g x
@@ -272,72 +277,76 @@ A natural transformation is not required to preserve all information.
 `Maybe` has a natural transformation to `List`:
 
 ```haskell
-maybeToList :: Nat Maybe List
+maybeToList :: Nat Maybe []
 maybeToList (Just x) = [x]
 maybeToList Nothing  = []
 ```
 
+Note that the type signature does not mention the type of the value in the container.
+We can expand the type signature to read as:
+
+```haskell
+maybeToList :: forall a. [a] -> Maybe a
+```
+
+We're asserting that this function must work for all types `a`, and that we can't use any information about the `a`s inside in order to implement the function.
 The reversal of this natural transformation is necessarily lossy:
 
 ```haskell
-listToMaybe :: Nat List Maybe
+listToMaybe :: Nat [] Maybe
 listToMaybe (x:_) = Just x
 listToMaybe []    = Nothing
 ```
 
 ## Monad
 
-A monad is a functor mapping a category to itself that is equipped with two natural transformations:
+A monad is an endofunctor (a mapping from $\cat{C}$ to $\cat{C}$) that is equipped with two natural transformations:
 
 1. $\eta$, or `return`, taking any object from the identity functor $I(\cat{C})$ to $F(\cat{C})$.
 2. $\mu$, or `join`, taking objects from $F(F(\cat{C}))$ to $F(\cat{C})$.
 
 Monads follow the monoid laws of associativity and identity where the unit is $\eta$ and $\oplus$ is $\mu$.
+The identity functor is an easy monad.
+The natural transformation $\eta$ is the identity natural transformation.
+For $\mu$, we can show (by commutativity of the diagram) that taking identity twice is equivalent to taking identity once:
 
-### Examples
+$$\begin{tikzcd}
+\cat{C} \arrow[r, "Id", bend right] \arrow[rr, "Id", bend left, dotted] & \cat{C} \arrow[r, "Id", bend right] & \cat{C}
+\end{tikzcd}$$
 
-We can imagine a functor as "wrapping" a value.
-`return` is a way to wrap an unwrapped value.
-`join` is a way of combining two layers of wrapping into a single wrapping.
+### More Code Examples
 
-Lists, optionals, and functions all form monads.
-Below, a type signature and implementation for `return` and `join` are provided for several instances:
-
-```haskell
-return :: a -> [a]
-return a = [a]
-
-return :: a -> Maybe a
-return a = Just a
-
-return :: a -> r -> a
-return a = \r -> a
-
-join :: [[a]] -> [a]
-join (xs : xss) = xs ++ join xss
-
-join :: Maybe (Maybe a) -> Maybe a
-join (Just (Just a)) = Just a
-join (Just Nothing)  = Nothing
-join Nothing         = Nothing
-
-join :: (r -> r -> a) -> (r -> a)
-join f = \r -> f r r
-```
-
-`bind`, also known as `flatMap` or `concatMap`, is `join . fmap f`.
-The type signature of `bind` is:
+Monads can be represented as a type class in Haskell, with the following definition:
 
 ```haskell
-bind :: forall m a b. Monad m => m a -> (a -> m b) -> m b
-bind ma f = join mapped
-  where
-    mapped :: m (m b)
-    mapped = fmap f ma
+class Applicative m => Monad m where
+    return :: a -> m a
+    (>>=)  :: m a -> (a -> m b) -> m b
+    join   :: m (m a) -> ma
+
+    ma >>= f = join (fmap f ma)
+    join mma = mma >>= \ma -> ma
 ```
 
-First, we map over the monadic structure using the `Functor`ial power.
-Then, the monadic contexts are collapsed using `join`.
+We can provide a default implementation of bind (written here with the infix operator `>>=`) and join written in terms of each other.
+Lists and optionals form monads.
+
+```haskell
+instance Monad [] where
+    return a = [a]
+    join (xs:xss) = xs ++ join xss
+```
+
+The list monad is used for nondeterministic programming and is the basis for list comprehensions in Haskell.
+
+```haskell
+instance Monad Maybe where
+    return a = Just a
+    Just a  >>= f = f a
+    Nothing >>= _ = Nothing
+```
+
+The `Maybe` monad is useful when sequencing actions that might fail, like looking up items in a dictionary.
 
 A monad is a powerful abstraction for sequencing computational effects.
 Given a value in a monadic structure `m`, we can provide a function that operates on that value and yields more monadic structure.
@@ -426,22 +435,46 @@ counit :: (r, r -> a) -> a
 ```
 
 Indeed, we can write a generic instance of the `Monad` type class in Haskell that works with any composition of two functors which form an adjunction.
+If we flip the composition, then we can write a comonad instance as well.
 This is witnessed below:
 
 ```haskell
 newtype Compose f g a = Compose { decompose :: f (g a) }
 
-instance Adjunction f g => Monad (Compose g f) where
+instance (Adjunction f g, Applicative f, Applicative g) => Monad (Compose g f) where
     return = Compose . unit
     m >>= f = Compose . fmap (right (decompose . f)) . decompose $ m
+
+instance (Adjunction f g) => Comonad (Compose f g) where
+    extract = counit . decompose
+    extend f = Compose . fmap (left (f . Compose)) . decompose
 ```
 
+If this is the case, then `Compose ((,) r) ((->) r)` should be a comonad, and `Compose ((->) r) ((,) r)` should be a monad.
+If we expand the types, we'll see that:
+
+```haskell
+Compose ((->) r) ((,) r)
+  = (->) r ((,) r a)
+  = r -> (r, a)
+
+Compose ((,) r) ((->) r)
+  = (,) r ((->) r a)
+  = (r, r -> a)
+```
+
+Indeed, the monad formed by the adjunction of the two functors is the `State` monad!
+The comonad is known as the `Store` comonad, and is less common in practice.
 
 # Link to Modal Logic
 
+Now that we've gathered all of our toys from logic and category theory, it's time to figure out how they're related.
+The type signatures of the functions in the `Monad` and `Comonad` classes look awfully familiar to the axioms for the $\Diamond$ and $\Box$ constructs.
+Let's see if there's more to that.
+
 ## Diamonad
 
-The $\Diamond$ operator in modal logic corresponds to the monad in category theory.
+The $\Diamond$ operator in modal logic looks like it corresponds to the monad in category theory.
 Let's consider the natural transformations $\eta : I(A) \to M(A)$ and $\mu : M(M(A)) \to M(A)$.
 Can we prove these?
 
@@ -471,7 +504,7 @@ We can additionally prove the type of `bind :: Monad m => m a -> (a -> m b) -> m
 
 ## Comonad
 
-The fundamental operations for a comonad are duplicate ($\Box A \implies \Box \Box A$), which is precisely the axiom that gives rise to $S4$ modal logic, and extract ($\Box A \implies A$), which is precisely the $\Box$ elimination rule.
+The fundamental operations for a comonad are duplicate ($\Box A \implies \Box \Box A$), which is precisely the axiom that gives rise to $S4$ modal logic, and extract ($\Box A \implies A$), which is the $\Box$ elimination rule.
 Comonads, as functors, also implement `fmap`, and the interaction of `fmap`, `duplicate`, and `extract` must follow the following laws:
 
 \begin{align}
@@ -482,8 +515,15 @@ duplicate \circ duplicate &= fmap \ duplicate \circ duplicate
 
 In $S4$ modal logic, a plain comonad is close to the $\Box$ operator, but we don't have $\Box (a \implies b) \implies (\Box a \implies \Box b)$.
 The Haskell type class `ComonadApply` equips a `Comonad` with exactly that function, allowing it to satisfy the $S4$ axioms.
-The modal logic used in the Lambda 5 system uses $S5$ as a basis, not $S4$.
 
+As Foner observed [@foner2015], all comonads in Haskell have a property known as *functorial strength*.
+Given some `f a` and a `b`, you can `strong b = fmap (\a -> (a, b))` to lift the `b` value into the `Functor`.
+This corresponds to a proposition of the form $B \implies \Box A \implies \Box (A \land B)$, which is impermissible in the logic.
+We'll need to take special care when writing our implementation to avoid this.
+
+## To IS5 and Beyond
+
+The modal logic used in the Lambda 5 system uses $IS5$ as a basis, not $S4$.
 Extending $S4$ to $S5$ adds the following axiom:
 
 $$\Diamond A \implies \Box \Diamond A$$
@@ -493,7 +533,8 @@ This makes a category theory interpretation somewhat tricky.
 One of the necessary features of both $\Box$ and a comonad is that we don't have $A \implies \Box A$ or $f : \forall w. Comonad \ w \implies a \to w \ a$.
 In this case, we're relying on some structure of the monad that permits us to push comonadic structure beneath.
 
-In order to extend this interpretation to $S5$, we must become more specific with our functors.
+In order to extend this interpretation to $S5$, we can't take just any old monad and comonad for our interpretation.
+We'll need to delve deeper.
 
 ## Double the Adjunction, Double the Functor
 
@@ -507,15 +548,13 @@ This gives rise to a monad $M = U \circ L$ and a comonad $W = U \circ R$ on $\ca
 Since adjunctions compose, the combination $M \dashv W$ is an adjunction.
 By assigning $M$ to $\Diamond$ and $W$ to $\Box$, we've arrived at the axiom we require: $\Diamond \dashv \Box$.
 [@awodey2006]
-
-What is the intuition for this trick?
-$R$ and $L$ are both functors that map $\cat{C}$ to $\cat{D}$, and $U$ is the functor that brings those objects back home to $\cat{C}$.
-By $L \dashv U$, we have that $L$ *lifts* items from $\cat{C}$ into $\cat{D}$, and $U$ *forgets* something about the objects when mapping them back to $\cat{C}$.
+Asserting that in Haskell gives us `Adjunction dia box` with a function `unit :: a -> box (dia a)`, which satisfies our requirement.
 
 Our task is to now find the appropriate functors and categories to provide a suitable implementation of Lambda 5.
 
 # Implementing in Haskell
 
+For the complete implementation, see the `Logic.Modal` Haskell module.
 The theory has presented us with a neat implementation plan.
 We can arrive at an S5 modal logic categorically.
 First, we'll define a type class that represents the axioms of S5 modal logic:

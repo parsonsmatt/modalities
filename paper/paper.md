@@ -510,7 +510,7 @@ By assigning $M$ to $\Diamond$ and $W$ to $\Box$, we've arrived at the axiom we 
 
 What is the intuition for this trick?
 $R$ and $L$ are both functors that map $\cat{C}$ to $\cat{D}$, and $U$ is the functor that brings those objects back home to $\cat{C}$.
-By $L \dashv U$, we have that $L$ *lifts* items into $\cat{C}$, and $U$ *forgets* something about the objects when mapping them back to $\cat{C}$.
+By $L \dashv U$, we have that $L$ *lifts* items from $\cat{C}$ into $\cat{D}$, and $U$ *forgets* something about the objects when mapping them back to $\cat{C}$.
 
 Our task is to now find the appropriate functors and categories to provide a suitable implementation of Lambda 5.
 

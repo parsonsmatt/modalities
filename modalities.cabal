@@ -20,8 +20,9 @@ library
                      , adjunctions
                      , comonad
                      , semigroupoids
+                     , transformers
+                     , distributive
   default-language:    Haskell2010
-  default-extensions:  MultiParamTypeClasses
 
 executable modalities-exe
   hs-source-dirs:      app
@@ -29,17 +30,6 @@ executable modalities-exe
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
                      , modalities
-  default-language:    Haskell2010
-
-test-suite modalities-test
-  type:                exitcode-stdio-1.0
-  hs-source-dirs:      test
-  main-is:             Spec.hs
-  build-depends:       base
-                     , modalities
---                     , hspec
---                     , QuickCheck
-  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 
 source-repository head

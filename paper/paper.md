@@ -554,19 +554,216 @@ Our task is to now find the appropriate functors and categories to provide a sui
 
 # Implementing in Haskell
 
-For the complete implementation, see the `Logic.Modal` Haskell module.
 The theory has presented us with a neat implementation plan.
 We can arrive at an S5 modal logic categorically.
-First, we'll define a type class that represents the axioms of S5 modal logic:
+For the complete implementation, see the `Logic.Modal` Haskell module.
+
+## Defining the Interface
+
+First, we'll define a type class that represents the axioms of $S4$ modal logic.
 
 ```haskell
-class Modal dia box where
-  axiomK :: box (a -> b) -> box a -> box b
-  axiomT :: box a -> a
-  axiom5 :: dia a -> box (dia a)
+class CModalS4 box where
+    axiom4 :: box p -> box (box p)
+    axiomT :: box p -> p
+    axiomK :: box (p -> q) -> box p -> box q
 ```
 
-Adjunctions (among other related abstractions) are defined in the Haskell package `adjunction` maintained by Edward Kmett. [@kmett-adjunctions-4.3]
-The type class we'
+We can demonstrate that this is exactly equivalent to the `ComonadApply` type class by providing an implementation solely in terms of that type class.
+To avoid requiring an `UndecidableInstance`, a `newtype` wrapper will be used to disambiguate the context.
+The only point of the newtype wrapper is to serve as a witness that the type `w` is an instance of `ComonadApply`.
+
+```haskell
+newtype S4Witness w a = Valhalla { witnessMe :: w a }
+
+instance ComonadApply w => CModalS4 (S4Witness w) where
+    axiom4 = Valhalla . fmap Valhalla . duplicate . witnessMe
+    axiomT = extract . witnessMe
+    axiomK (Valhalla f) (Valhalla a) = Valhalla (f <@> a)
+```
+
+Since this establishes that they're equivalent, we can relegate `ModalS4` as a type alias.
+Equipped with this, the definition for `ModalS5` is the addition of the $B$ axiom in type signature form:
+
+```haskell
+type ModalS4 = ComonadApply
+
+class (Monad dia, ModalS4 box) => ModalS5 box dia where
+    axiomB :: a -> box (dia a)
+```
+
+As is customary when doing fancy things with Haskell, we'll provide some infix type operator aliases to pretend that we're real mathematicians.
+These will help clarify the instance contexts when defining the generic `Monad` and `Comonad` instance
+
+```haskell
+type f :.: g = Compose f g
+type f -| g = Adjunction f g
+
+instance (f -| g, Applicative f, Applicative g) => Monad (g :.: f) where
+    return = Compose . unit
+    m >>= f = Compose . fmap (rightAdjunct (getCompose . f)) . getCompose $ m
+
+instance (f -| g) => Comonad (f :.: g) where
+    extract = counit . getCompose
+    extend f = Compose . fmap (leftAdjunct (f . Compose)) . getCompose
+```
+
+The `Applicative` instances are required, as all `Monad`s must be instances of the `Applicative` type class in recent versions of Haskell (and morally in all versions of Haskell).
+And now, for the final bit of fun:
+
+```haskell
+instance (g -| u, u -| f, ModalS4 (u :.: f), Applicative u, Applicative g)
+        => ModalS5 (u :.: f) (u :.: g) where
+    axiomB = unit
+```
+
+Provided that `g` is left adjoint to `u`, `u` is left adjoint to `f`, `u` and `g` are both `Applicative` functors, and finally that the composition of `u` and `f` satisfy the `ModalS4` axioms, then the compositions of `u`, `f`, and `g` satisfy the `ModalS5` axioms automatically.
+Now that we've defined the logical type class, all that's left is to provide the functors `u`, `f`, and `g` that satisfy the required constraints.
+
+## Mechanical Satisfaction
+
+In keeping with the spirit of programming in a lazy language, I'll lazily define the necessary functors as empty type constructors, and have the compiler assert the various requirements we need.
+We'll fill in only the bare minimum to get it to compile, punting any real design decisions until later.
+
+```haskell
+data U a
+data F a
+data G a
+
+type Box = U :.: F
+type Dia = U :.: G
+
+pls :: ModalS5 Box Dia => ()
+pls = ()
+```
+
+By repeatedly requesting the `:type` of `pls` in GHCi, this causes the solver to attempt to find instances and resolve them.
+When it fails, it reports the failure, and we can fill in a pretend implementation.
+The list it provides is:
+
+* `Applicative G`
+* `Applicative U`
+* `ComonadApply (U :.: F)`
+* `Adjunction U F`
+* `Functor F`
+* `Representable F`
+* `Distributive F`
+* `Adjunction G U`
+* `Representable U`
+* `Distributive U`
+
+which we can laughingly provide a dummy implementation as:
+
+```haskell
+data U a
+    deriving (Functor)
+
+instance Applicative U where
+    pure = undefined
+    (<*>) = undefined
+
+instance ComonadApply (U :.: F) where
+    (<@>) = undefined
+
+instance Adjunction U F where
+    unit = undefined
+    counit = undefined
+
+instance Adjunction G U where
+    unit = undefined
+    counit = undefined
+
+instance Representable U where
+    type Rep U = U Int
+    tabulate = undefined
+    index = undefined
+
+instance Distributive U where
+
+data F a
+    deriving (Functor)
+
+instance Representable F where
+    type Rep F = F Int
+    tabulate = undefined
+    index = undefined
+
+instance Distributive F where
+
+data G a
+    deriving (Functor)
+
+instance Applicative G where
+    pure = undefined
+    (<*>) = undefined
+```
+
+Now that we've mechanically arrived at our constraints, it is time to consider the actual semantics of these types.
+The semantics of the types will provide the implementation of the data constructors, which will permit implementations of the type classes, which will provide an implementation of the modal logic we require.
+
+## G, F, U and Meaning
+
+Lambda 5's $\Box A$ represents a continuation yielding a value of type $A$ that can be run anywhere on the network.
+The $\Diamond A$ represents a remote address of a value of type $A$.
+We might be tempted to note that the definition of $\Box$ sounds like a pure computation with no dependencies, equivalent to a lambda expression with no free variables.
+If we take that road, then $\Box$ is simply the type of pure computations, or the `Identity` comonad.
+We could dispense with the `Identity`, leaving us an interpretation of $\Box$ that was simply ordinary Haskell values.
+Wherever we have a comonad on $\cat{C}$, we also have a monad with the reversed morphisms, so we can categorically *shift* the monads up a stack.
+We'd require a pair of monads $M_1$ and $M_2$, then, one to represent ordinary expressions in modal logic, and another to represent $\Diamond$.
+
+Unfortunately, this fails to work in Haskell for one reason: free variables!
+Consider the following snippet:
+
+```haskell
+foo :: Int -> Int -> Int
+foo x y = x + y * bar
+
+bar :: Int
+bar = 6
+```
+
+If we tried to `box` up `foo` and send it across the network, it'd blow up at runtime, requesting access to the `bar` term.
+This demonstrates that the $\Box$ must be a sealed, complete $\Box$: no free variables.
+The "effect" of plain Haskell values then is access to free variables in the local machine state.
+In order to provide computations that may be run remotely, we must eliminate these free variables.
+The composition $U \circ F$ must provide some means of packaging values and closures and making them available.
+
+The $\Diamond$ is comparatively simple to implement.
+Let's inspect a snippet of code to see how it might work:
+
+```haskell
+remoteValue :: Dia Int
+remoteValue = ...
+
+someFoo :: Dia Bool
+someFoo = do
+    value <- remoteValue
+    return (10 < value)
+```
+
+Supposing we have some `remoteValue` representing an `Int` available at some location, we can bind the `Int` out of that, and do operations on it in the `Dia` monad.
+Alternatively, we should also be able to attempt to `fetch` the remote value.
+Fetching will naturally have some concept of failure, and will need to take place in `IO`.
+The natural type of `fetch`, then, is:
+
+```haskell
+fetch :: Dia a -> ExceptT NetworkError IO a
+```
+
+Which, in turn, provides some information as to what the functors for `Dia` might be.
+`ExceptT NetworkError IO a` is a monad transformer stack representing an `IO (Either NetworkError a)`.
+We might be tempted, then, to declare `U` as `IO` and `G` as `Either NetworkError`.
+There's an issue with that: The `U` functor is shared with the `Comonad`, and `IO` is certainly not a comonad of any sort.
+This implementation then fails to satisfy our logic.
+`U` remains elusive, though `G` could very well be `ExceptT NetworkError IO a`.
+
+Let's recap and expand the concrete definitions of `Box` and `Dia` in our implementation thus far:
+
+```haskell
+type Box = U :.: F
+  = U (F a)
+type Dia = U :.: G
+  = U (G a)
+```
 
 # References

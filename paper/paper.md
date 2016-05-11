@@ -703,6 +703,8 @@ The semantics of the types will provide the implementation of the data construct
 
 ## G, F, U and Meaning
 
+### Boxing it up
+
 Lambda 5's $\Box A$ represents a continuation yielding a value of type $A$ that can be run anywhere on the network.
 The $\Diamond A$ represents a remote address of a value of type $A$.
 We might be tempted to note that the definition of $\Box$ sounds like a pure computation with no dependencies, equivalent to a lambda expression with no free variables.
@@ -728,6 +730,21 @@ The "effect" of plain Haskell values then is access to free variables in the loc
 In order to provide computations that may be run remotely, we must eliminate these free variables.
 The composition $U \circ F$ must provide some means of packaging values and closures and making them available.
 
+For inspiration on our next step, let's consider the introduction rule for $\Box$:
+
+$$A \vdash \Box A$$
+
+which we may read in plain English as "If it is provable that, with no assumptions, $A$ is true, then $\Box A$ is true."
+By substituting provability for runnability and assumptions with dynamic values, we arrive at "If $A$ is runnable with no input at run-time, then $\Box A$ is runnable."
+The model that we're seeking is akin to the `constexpr` or `const` from C++ template metaprogramming.
+Our $\Box$ will be built at compile-time for our run-time programs to be able to use, unpack, and send about the network.
+
+This insight fueled the development of Cloud Haskell. [@Epstein11]
+Cloud Haskell features a Template Haskell directive to package a closure up at compile time as long as all of the values are instances of a `Serializable` type class.
+The `distributed-static` library [@distributed-static-0.3.4.0] makes these functions available.
+
+### Remote Diamond
+
 The $\Diamond$ is comparatively simple to implement.
 Let's inspect a snippet of code to see how it might work:
 
@@ -743,7 +760,7 @@ someFoo = do
 
 Supposing we have some `remoteValue` representing an `Int` available at some location, we can bind the `Int` out of that, and do operations on it in the `Dia` monad.
 Alternatively, we should also be able to attempt to `fetch` the remote value.
-Fetching will naturally have some concept of failure, and will need to take place in `IO`.
+Fetching will naturally have some concept of failure, and will need to take place in `IO` in order to access network resources.
 The natural type of `fetch`, then, is:
 
 ```haskell
@@ -757,13 +774,24 @@ There's an issue with that: The `U` functor is shared with the `Comonad`, and `I
 This implementation then fails to satisfy our logic.
 `U` remains elusive, though `G` could very well be `ExceptT NetworkError IO a`.
 
-Let's recap and expand the concrete definitions of `Box` and `Dia` in our implementation thus far:
+## Head in the Clouds
+
+The Cloud Haskell paper describes a `Static` type that corresponds with values known at compile time, along with a `Closure` type that represents serialized function closures.
+The paper describes a primitive, `static e`, which (at compile time) takes an `e :: a` and makes a `Static a` out of it, and another primitive `unstatic :: Static a -> a`.
+All terms described in the `e` to be `static`ed must be top level definitions or constants, permitting the compiler to evaluate them at compile time, serialize them, and apply the `Static` constructor.
+If we can define either `duplicate :: Static a -> Static (Static a)` or `extend :: Static a -> (Static a -> b) -> Static b`, then we've got a `Comonad` instance.
+These primitives require an extension to the Haskell compiler and runtime to implement, and that work has yet to be completed.
+The library that implements these concepts without extensions [@distributed-static-0.3.4.0] has a different model of execution, and requires that the unpacking of static values operate in the `ProcessM` monad.
+
+This instance satisfies the requirements to form a comonad.
 
 ```haskell
-type Box = U :.: F
-  = U (F a)
-type Dia = U :.: G
-  = U (G a)
+instance Comonad Static where
+    extract = unstatic
+    duplicate s = static s
 ```
+
+We can can justify the use of `static` in the definition of `duplicate`
+
 
 # References

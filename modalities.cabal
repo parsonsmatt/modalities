@@ -24,6 +24,11 @@ library
                      , distributive
                      , distributed-process
                      , distributed-static
+                     , mtl
+                     , binary
+                     , syb
+                     , tagged
+                     , containers
   default-language:    Haskell2010
 
 executable modalities-exe

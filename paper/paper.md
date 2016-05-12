@@ -917,10 +917,7 @@ the `e` to be `static`ed must be top level definitions or constants, permitting
 the compiler to evaluate them at compile time, serialize them, and apply the
 `Static` constructor. If we can define either `duplicate :: Static a -> Static
 (Static a)` or `extend :: Static a -> (Static a -> b) -> Static b`, then we've
-got a `Comonad` instance. These primitives require an extension to the Haskell
-compiler and runtime to implement, and that work has yet to be completed.
-
-This instance satisfies the requirements to form the comonad we require in
+got a `Comonad` instance. This instance satisfies the requirements to form the comonad we require in
 order to implement $\Box$ for our logic.
 
 ```haskell
@@ -933,9 +930,59 @@ instance ComonadApply Static where
 ```
 
 We're safe to use `static` on the `s :: Static a` as the type `Static a` is a
-proof that `s` is entirely serialized or a top-level definition.
+proof that `s` is entirely serialized or a top-level definition. Given an
+appropriate implementation of Cloud Haskell in a forthcoming version of GHC,
+we've successfully provided the $\Box$ for implementing Lambda 5.
 
-The library that implements these concepts without compiler extensions
+Cloud Haskell also presents a `Process` monad, which is used to execute code on
+remote hosts. The abstraction is Erlang-style message passing, so Cloud Haskell
+does not support `fetch`-style requests by default. The provided primitives in
+this abstraction are:
+
+- `spawn`, a function that launches a closure on a provided `NodeId`, returning
+  the new `ProcessId`
+- `send`, a function that sends a message to a `ProcessId`
+- `expect`, a function that blocks the process awaiting a message.
+
+We can implement `fetch` on top of this paradigm:
+
+```haskell
+newtype Fetch k a = Fetch k
+    deriving (Binary)
+
+newtype Response k a = Response (Maybe a)
+    deriving (Binary)
+
+fetch
+    :: forall k a. (Serializable k, Serializable a)
+    => k
+    -> ProcessId
+    -> Process (Response k a)
+fetch k pid = do
+    self <- getSelfPid
+    send pid (self, Fetch k :: Fetch k a)
+    expect
+
+fetchListen
+    :: forall k a. (Serializable k, Serializable a, Ord k)
+    => IORef (Map k a)
+    -> Process ()
+fetchListen ref = forever $ do
+    (pid, Fetch k) <- expect :: Process (ProcessId, Fetch k a)
+    table <- liftIO $ readIORef ref
+    send pid (Response (Map.lookup k table) :: Response k a)
+```
+
+`fetch` takes a `k` and a `ProcessId` and sends the lookup request and the
+current process ID to the target. The `fetchListen` function has a reference to
+a dictionary of `k` to `a`, awaiting `Fetch` requests, and responding with the
+value contained therein or `Nothing`.
+
+# Conclusion
+
+The `static` and `unstatic` primitives require an extension to the Haskell
+compiler and runtime to implement, and that work has yet to be completed. The
+library that implements these concepts without compiler extensions
 [@distributed-static-0.3.4.0] has a different model of execution. Since the
 compiler isn't able to enforce the correctness of the static values and lookup
 table, the type of `unstatic` is:
@@ -951,13 +998,9 @@ if the type safe `fromDynamic :: Typeable a => Dynamic -> Maybe a` cast
 succeeds, then the function returns the `Right` result. If the lookup or cast
 failed, then the function returns the `Left` error message.
 
-`Either` cannot be made into a `Comonad`. What are we to do?
-
-# Coercing the Cloud
-
-On the one hand, we have Murphy's Lambda 5 distributed lambda calculus. On the
-other, we have an implementation of Cloud Haskell. These two are tantalizingly
-close to working together, if we can figure out some way to make an instance of
-`ComonadApply` for the provided `Static` type in `distributed-static`
+This paper demonstrates that a categorical interpretation of the logical system
+presented by Murphy corresponds to the theoretical implementation of Cloud
+Haskell. As of right now, an implementation of Murphy's Lambda 5 is not possible
+with the current version of GHC and the `distributed-{process,static}` libraries.
 
 # References

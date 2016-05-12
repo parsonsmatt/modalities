@@ -1,21 +1,30 @@
 {-# OPTIONS_GHC -fno-warn-orphans #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 module Logic.Modal where
 
+import Control.Monad
+import Data.IORef
+import Data.Map (Map)
+import qualified Data.Map as Map
+import Control.Distributed.Process
 import Data.Functor.Compose
+import Data.Binary
 import Control.Comonad
 import Data.Functor.Adjunction
 import Data.Distributive
 import Data.Functor.Rep
+import Control.Distributed.Process.Serializable
 
 -- | The composition of two type constructors.
 type (f :.: g) = Compose f g
@@ -106,3 +115,29 @@ type Dia = U :.: G
 
 pls :: ModalS5 Box Dia => ()
 pls = ()
+
+fetch
+    :: forall k a. (Serializable k, Serializable a)
+    => k
+    -> ProcessId
+    -> Process (Response k a)
+fetch k pid = do
+    self <- getSelfPid
+    send pid (self, Fetch k :: Fetch k a)
+    expect
+
+fetchListen
+    :: forall k a. (Serializable k, Serializable a, Ord k)
+    => IORef (Map k a)
+    -> Process ()
+fetchListen ref = forever $ do
+    (pid, Fetch k) <- expect :: Process (ProcessId, Fetch k a)
+    table <- liftIO $ readIORef ref
+    send pid (Response (Map.lookup k table) :: Response k a)
+
+
+newtype Fetch k a = Fetch k
+    deriving (Binary)
+
+newtype Response k a = Response (Maybe a)
+    deriving (Binary)

@@ -22,6 +22,8 @@ library
                      , semigroupoids
                      , transformers
                      , distributive
+                     , distributed-process
+                     , distributed-static
   default-language:    Haskell2010
 
 executable modalities-exe
